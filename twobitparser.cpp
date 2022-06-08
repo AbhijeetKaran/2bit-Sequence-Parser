@@ -1,13 +1,16 @@
-
-#include<stdio.h>
+#include <bits/stdc++.h>
+#include<string.h>
 #include<iostream>
+#include<stdio.h>
 #include<fstream>
-#include<vector>
 #include<bitset>
+#include<vector>
+#include<map>
 
 #define bits32 unsigned int
 #define bits64 unsigned long long
 #define UBYTE char
+#define LARGEBITSET std::bitset<5000000000>
 
 using namespace std;
 
@@ -24,6 +27,7 @@ class BitIndex{
         UBYTE nameSize;
         char *name;	
         bits32 offset;
+        size_t sequenceSize;
 };
 
 class Data{
@@ -38,24 +42,72 @@ class Data{
         bits32 reserved;
 };
 
-inline void readHeader(fstream &rf,Header &h){
-    // std::cout<<"\t\tHEADER info"<<std::endl;
+class TwoBitReader{
+    public:
+        string str_filename;
+        Header header;
+        fstream f;
+        std::map<string,BitIndex*> seqBitMap;
+        std::map<string,std::map<int,int>> NMap;
+        std::map<string,std::map<int,int>> maskMap;
+
+        TwoBitReader(string str_filen){
+            str_filename = str_filen;
+            f.open(str_filename,ios::in|ios::binary);            
+            readHeader(f,header);
+            readIndex(f,header,seqBitMap);
+            readNBlocks();
+        }
+
+        ~TwoBitReader(){};
+
+    private:
+        // private functions to read 2bit file data
+        inline void readHeader(fstream &f,Header &h);
+        inline void readIndex(fstream &f,Header &header,std::map<string,BitIndex*> &seqBitMap);
+        void readData(string &str_filename,BitIndex *bi,LARGEBITSET *bitArray,LARGEBITSET *bitNs,size_t &szt_seqSize);
+        
+        void readNBlocks();
+        char bitToNucM(size_t &b1,size_t &b2);
+        void tokenizer(string &line,string &str_seqID,string &str_start,string &str_end);
+        void getSequenceLength(fstream &rf,std::map<string,BitIndex*> &seqBitMap);
+
+
+    public:
+        map<string,size_t>* showSequenceIds();
+        
+        size_t countNs();
+        size_t countNs(string str_seqName);
+
+        size_t countSoftMasked();
+        size_t countSoftMasked(string str_seqName);
+        
+        map<char,size_t>* bases(char *sequence);
+
+        char* extractSequence(string seqID);
+        char* extractSequence(const string &str_sequenceName,const size_t &szt_start,const size_t &szt_end);
+        
+        // Extra functions with no return type but console outputs
+        void twoBitToFasta(string &outputFilename);
+        void softMaskSequencesUsingBedFile(string &bedFileName);
+        void hardMaskSequencesUsingBedFile(string &bedFileName);
+        void extractSequenceFromBedFile(const string &str_bedFileName,const size_t mode);
+};      
+
+// SEction for all the reading information
+inline void TwoBitReader::readHeader(fstream &rf,Header &h){
     rf.read(reinterpret_cast<char *>(&h.signature),sizeof(h.signature));
     rf.read(reinterpret_cast<char *>(&h.version),sizeof(h.version));
     rf.read(reinterpret_cast<char *>(&h.seqCount),sizeof(h.seqCount));
     rf.read(reinterpret_cast<char *>(&h.reserved),sizeof(h.reserved));
-
-    // std::cout<<"signature: "<<h.signature<<std::endl;
-    std::cout<<"number of seq: "<<h.seqCount<<std::endl;
 }
 
-inline void readIndex(fstream &rf,vector<BitIndex*> &bii,bits32 &seqCount){
-    // std::cout<<"\t\tINDEX info"<<std::endl;
-    for(int i=0;i<seqCount;i++){
+inline void TwoBitReader::readIndex(fstream &rf,Header &header,std::map<string,BitIndex*> &seqBitMap){
+    for(int i=0;i<header.seqCount;i++){
+        
         BitIndex *bi = new BitIndex();
         
         rf.read(reinterpret_cast<char *>(&bi->nameSize),sizeof(bi->nameSize));
-        
         char n[int(bi->nameSize)];
         bi->name = (char*)malloc(sizeof(char)*int(bi->nameSize));
         bi->name[int(bi->nameSize)+1] = '\0';
@@ -63,22 +115,21 @@ inline void readIndex(fstream &rf,vector<BitIndex*> &bii,bits32 &seqCount){
         for(int i=0;i<bi->nameSize;i++){
             bi->name[i] = n[i];
         }
+    
         rf.read(reinterpret_cast<char *>(&bi->offset),sizeof(bi->offset));
-        bii.emplace_back(bi);
-
-        // std::cout<<"sequence name size: "<<int(bi->nameSize)<<std::endl;
-        // std::cout<<"sequence name: "<<bi->name<<std::endl;
-        // std::cout<<"sequence data offset value: "<<bi->offset<<std::endl;
+        seqBitMap.insert({bi->name,bi});
     }
+    getSequenceLength(rf,seqBitMap);
 }
 
-void readData(fstream &rf,BitIndex *bi,std::bitset<100> *bitArray,std::bitset<100> *bitNs){
-    bitNs[0]=0;
+void TwoBitReader::readData(string &str_filename,BitIndex *bi,LARGEBITSET *bitArray,LARGEBITSET *bitNs,size_t &szt_seqSize){
+    fstream rf(str_filename,ios::in|ios::binary);
     Data d;
-    std::cout<<bi->name<<std::endl;
+
     rf.seekg(bi->offset,ios::beg);
 
     rf.read(reinterpret_cast<char *>(&d.size),sizeof(d.size));
+    szt_seqSize = d.size;
     rf.read(reinterpret_cast<char *>(&d.nBlockCount),sizeof(d.nBlockCount));
 
     d.nStarts = (bits32*)malloc(sizeof(bits32)*d.nBlockCount);
@@ -105,14 +156,6 @@ void readData(fstream &rf,BitIndex *bi,std::bitset<100> *bitArray,std::bitset<10
 
     rf.read(reinterpret_cast<char *>(&d.reserved),sizeof(d.reserved));
 
-    // std::cout<<d.size<<std::endl;
-    // std::cout<<d.nBlockCount<<std::endl;
-    // std::cout<<d.nStarts[0]<<std::endl;
-    // std::cout<<d.nSizes[0]<<std::endl;
-    // std::cout<<d.maskBlockCount<<std::endl;
-    // std::cout<<d.maskStarts[0]<<std::endl;
-    // std::cout<<d.maskSizes[0]<<std::endl;
-    // std::cout<<d.reserved<<std::endl;
     char c;
     size_t seqRun=0;
     unsigned long long int run = 0;
@@ -137,49 +180,438 @@ void readData(fstream &rf,BitIndex *bi,std::bitset<100> *bitArray,std::bitset<10
             bitNs[0].set(cord+1,1);
         }
     }
-
-    unsigned long long int dn = d.size*2;
-
-    for(int n=0;n<dn;n++){
-        cout<<bitNs[0][n];
-    }
-    cout<<endl;
-
-    for(int n=0;n < dn;n++){
-        cout<<bitArray[0][n];
-    }
-    cout<<endl;
-
-
-
 }
 
-void readTwoBit(string &str_filename){
-    fstream rf(str_filename,ios::in|ios::binary);
-    Header h;
-    readHeader(rf,h);
+// sections for utils functions
+map<string,size_t>* TwoBitReader::showSequenceIds(){
+    map<string,size_t> *temp_map = new map<string,size_t>();
+    for (auto i : seqBitMap){   
+        string str_seqName = i.first;
+        BitIndex *bi = i.second;    
+        temp_map->insert({str_seqName,bi->sequenceSize});
+    }
+    return temp_map;
+}
+
+size_t TwoBitReader::countNs(){
+    size_t totalNs = 0;
+    for(auto f : NMap){
+        for(auto s : f.second){
+            totalNs += s.second;
+        }
+    }
+    return totalNs;
+}
+
+size_t TwoBitReader::countNs(string str_seqName){
+    size_t totalNs = 0;
+    for(auto f : NMap[str_seqName]){
+        totalNs += f.second;
+    }
+    return totalNs;
+}
+
+size_t TwoBitReader::countSoftMasked(){
+    size_t totalMased = 0;
+    for(auto f : maskMap){
+        for(auto s : f.second){
+            totalMased += s.second;
+        }
+    }
+    return totalMased;
+}
+
+size_t TwoBitReader::countSoftMasked(string str_seqName){
+    size_t totalMasked = 0;
+    for(auto f : NMap[str_seqName]){
+        totalMasked += f.second;
+    }
+    return totalMasked;
+}
+
+
+map<char,size_t>* TwoBitReader::bases(char *sequence){
+    char *ptr = sequence;
+    map<char,size_t> *temp_map = new map<char,size_t>();
+    temp_map->insert({'A',0});
+    temp_map->insert({'C',0});
+    temp_map->insert({'T',0});
+    temp_map->insert({'G',0});
+    temp_map->insert({'N',0});
+
+    for(;*ptr != '\0';ptr++){
+        switch(*ptr){
+            case 'A': { 
+                (*temp_map)['A'] += 1;
+                break;
+            }
+            case 'a': { 
+                (*temp_map)['A'] += 1;
+                break;
+            }
+            case 'C': { 
+                (*temp_map)['C'] += 1;
+                break;
+            }
+            case 'c': { 
+                (*temp_map)['C'] += 1;
+                break;
+            }case 'T': { 
+                (*temp_map)['T'] += 1;
+                break;
+            }
+            case 't': { 
+                (*temp_map)['T'] += 1;
+                break;
+            }case 'G': { 
+                (*temp_map)['G'] += 1;
+                break;
+            }
+            case 'g': { 
+                (*temp_map)['G'] += 1;
+                break;
+            }case 'N': { 
+                (*temp_map)['N'] += 1;
+                break;
+            }
+            case 'n': { 
+                (*temp_map)['N'] += 1;
+                break;
+            } 
+        }    
+    }
+    return temp_map;
+}
+
+char* TwoBitReader::extractSequence(string seqID){
+    BitIndex *bi = seqBitMap[seqID];
+
+    LARGEBITSET *b_bitArray;
+    LARGEBITSET *b_bitNs;
     
-    vector<BitIndex*> bii;
-    readIndex(rf,bii,h.seqCount);
+    b_bitArray = (LARGEBITSET *)malloc(sizeof(LARGEBITSET));
+    b_bitNs = (LARGEBITSET *)malloc(sizeof(LARGEBITSET));
+    
+    readData(str_filename,bi,b_bitArray,b_bitNs,bi->sequenceSize);
+    size_t seqSize = (bi->sequenceSize/2);
 
-    // std:cout<<"\t\tData info"<<std::endl;
-    for(int i=0;i<bii.size();i++){
-        BitIndex *bi = bii[i];
+    char *sequence = (char*)malloc(seqSize*sizeof(char));
+    sequence[seqSize+1] = '\0';
+
+    for(int i=0,j=0;i<bi->sequenceSize;){
+        size_t b1 = size_t(b_bitArray[0][i]);
+        size_t b2 = size_t(b_bitArray[0][i+1]);
+        sequence[j] = bitToNucM(b1,b2);
+        i+=2;
+        j++;
+    }
+    return sequence;
+}
+
+char* TwoBitReader::extractSequence(const string &str_sequenceName,const size_t &szt_start,const size_t &szt_end){
+    BitIndex *bi = seqBitMap[str_sequenceName];
+
+    LARGEBITSET *b_bitArray;
+    LARGEBITSET *b_bitNs;
+    
+    b_bitArray = (LARGEBITSET *)malloc(sizeof(LARGEBITSET));
+    b_bitNs = (LARGEBITSET *)malloc(sizeof(LARGEBITSET));
+    
+    readData(str_filename,bi,b_bitArray,b_bitNs,bi->sequenceSize);
+    size_t seqSize = (bi->sequenceSize/2);
+
+    size_t requiredSize = (szt_end-szt_start)+2;
+    char *sequence = (char*)malloc(requiredSize*sizeof(char));
+    sequence[requiredSize+1] = '\0';
+
+    for(int i=szt_start*2,j=0;i<szt_end*2;){
+        size_t b1 = size_t(b_bitArray[0][i]);
+        size_t b2 = size_t(b_bitArray[0][i+1]);
+
+        // checking for N's
+        bool b_N = false;
+        auto NmapElement = NMap[str_sequenceName];
+        for (auto nucN : NmapElement){
+            if((i >= nucN.first) && (i <= (nucN.first+nucN.second))){
+                b_N = true;
+                break;
+            }
+        }
+
+        //checking for soft-masked
+        bool b_mask = false;
+        auto NmapElementMask = maskMap[str_sequenceName];
+        for (auto nucN : NmapElementMask){
+            if((i >= nucN.first) && (i <= (nucN.first+nucN.second))){
+                b_mask = true;
+                break;
+            }
+        }
+
+        if (!b_N){
+            if(!b_mask){
+                sequence[j] = bitToNucM(b1,b2);
+            } else {
+                sequence[j] = tolower(bitToNucM(b1,b2));
+            }
+        } else {
+            sequence[j] = 'N';
+        }
         
-        std::bitset<100> *b_bitArray;
-        b_bitArray = (std::bitset<100> *)malloc(sizeof(std::bitset<100>));
-        
-         std::bitset<100> *b_bitNs;
-        b_bitNs = (std::bitset<100> *)malloc(sizeof(std::bitset<100>));
-        
-        readData(rf,bi,b_bitArray,b_bitNs);
+        i+=2;
+        j++;
+    }
+
+    return sequence;
+}
+
+void TwoBitReader::twoBitToFasta(string &outputFilename){
+    outputFilename += ".2bit";
+    ofstream of;
+    of.open(outputFilename);
+
+    for (auto seqid: seqBitMap){    
+        char *sequence = nullptr;
+        sequence = extractSequence(seqid.first);
+        of<<'>'<<seqid.first<<endl;
+        char *ptr = sequence;
+
+        int i=1;
+        while(*ptr != '\0'){
+            if (i < 60)
+                of<<*ptr;
+            else{
+                of<<endl<<*ptr;
+                i=1;
+            }
+            i++;
+            ptr++;
+        }
+        free(sequence);
     }
 }
 
-int main()
-{
-    string filename = "sample.2bit";
-    readTwoBit(filename);
+void TwoBitReader::softMaskSequencesUsingBedFile(string &bedFileName){
+    ifstream inf(bedFileName);
+    if(inf.is_open()){
+        string line;
+        while(getline(inf,line)){
+            string seqId;
+            string start;
+            string end;
+            tokenizer(line,seqId,start,end);
+            
+            char *sequence = nullptr;
+            sequence = extractSequence(seqId);
 
-    return 0;
+            char *ptr = sequence;
+            int i = 1;
+            int j = 1;
+            while(*ptr != '\0'){
+                bool b_soft = false;
+                if ((j >= stoi(start)) && (j <= stoi(end))){
+                    b_soft = true;
+                }
+
+                char c = *ptr;
+                if (b_soft){
+                    c = tolower(c);
+                }
+
+                if (i < 60)
+                    cout<<c;
+                else{
+                    cout<<endl<<c;
+                    i=1;
+                }
+                i++;
+                j++;
+                ptr++;
+            }
+            free(sequence);
+        }
+        inf.close();
+    }
+}
+
+void TwoBitReader::hardMaskSequencesUsingBedFile(string &bedFileName){
+    ifstream inf(bedFileName);
+    if(inf.is_open()){
+        string line;
+        while(getline(inf,line)){
+            string seqId;
+            string start;
+            string end;
+            tokenizer(line,seqId,start,end);
+            
+            char *sequence = nullptr;
+            sequence = extractSequence(seqId);
+
+            char *ptr = sequence;
+            int i = 1;
+            int j = 1;
+      
+            while(*ptr != '\0'){
+                bool b_hard = false;
+
+                if ((j >= stoi(start)) && (j <= stoi(end))){
+                    b_hard = true;
+                }
+
+                char c = *ptr;
+                if (b_hard){
+                    c = 'N';
+                }
+
+                if (i < 60){
+                    cout<<c;
+                }
+                else{
+                    cout<<endl<<c;
+                    i=1;
+                }
+                i++;
+                j++;
+                ptr++;
+            }
+            free(sequence);
+        }
+        inf.close();
+    }
+}
+
+
+
+void TwoBitReader::extractSequenceFromBedFile(const string &str_bedFileName,const size_t mode){
+    ifstream bedfile;
+    string line;
+    bedfile.open(str_bedFileName);
+    if(bedfile.is_open())
+    {
+        while (!bedfile.eof()){
+            getline(bedfile,line);
+            string str_seqID;
+            string str_start;
+            string str_end;
+            tokenizer(line,str_seqID,str_start,str_end);
+            size_t a = stoi(str_start);
+            size_t b = stoi(str_end);
+            char *sequence = extractSequence(str_seqID,a,b);
+            switch(mode){
+                case 0: {
+                    cout<<'>'<<str_seqID<<endl;
+                    cout<<sequence<<endl;
+                    break;
+                }
+                case 1: {
+                    cout<<str_seqID<<"\t"<<a<<"\t"<<b<<"\t";
+                    cout<<sequence<<endl;
+                    break;
+                }
+                default: {
+                    cout<<"wrong input for last parameter"<<endl;
+                    exit(0);
+                }
+            }
+            free(sequence);
+        }
+    }
+    bedfile.close();
+}
+
+//extra functions
+void TwoBitReader::readNBlocks(){
+    fstream rf(str_filename,ios::in|ios::binary);
+    Data d;
+        
+    for (auto p : seqBitMap)
+    {
+        BitIndex *bi = p.second;
+        rf.seekg(bi->offset,ios::beg);
+
+        // NMap.insert({{bi->name,new map(pair<int,int>({0,0}))}});
+
+        rf.read(reinterpret_cast<char *>(&d.size),sizeof(d.size));
+        rf.read(reinterpret_cast<char *>(&d.nBlockCount),sizeof(d.nBlockCount));
+
+        // N info
+        d.nStarts = (bits32*)malloc(sizeof(bits32)*d.nBlockCount);
+        map<int,int> n;
+
+        for(int i=0;i<d.nBlockCount;i++){
+            rf.read(reinterpret_cast<char *>(&d.nStarts[i]),sizeof(d.nStarts[i]));
+        }
+        d.nSizes = (bits32*)malloc(sizeof(bits32)*d.nBlockCount);
+        for(int i=0;i<d.nBlockCount;i++){
+            rf.read(reinterpret_cast<char *>(&d.nSizes[i]),sizeof(d.nSizes[i]));
+            n.insert({d.nStarts[i],d.nSizes[i]});
+        }   
+        
+        rf.read(reinterpret_cast<char *>(&d.maskBlockCount),sizeof(d.maskBlockCount));
+        
+        // mask info
+        d.maskStarts = (bits32*)malloc(sizeof(bits32)*d.maskBlockCount);
+        map<int,int> m;
+        for(int i=0;i<d.maskBlockCount;i++){
+            rf.read(reinterpret_cast<char *>(&d.maskStarts[i]),sizeof(d.maskStarts[i]));
+        }
+
+        d.maskSizes = (bits32*)malloc(sizeof(bits32)*d.maskBlockCount);
+        for(int i=0;i<d.maskBlockCount;i++){
+            rf.read(reinterpret_cast<char *>(&d.maskSizes[i]),sizeof(d.maskSizes[i]));
+            m.insert({d.maskStarts[i],d.maskSizes[i]});
+        }
+        
+        NMap.insert({{bi->name,std::move(n)}});
+        maskMap.insert({bi->name,std::move(m)});
+    }
+}
+
+char TwoBitReader::bitToNucM(size_t &b1,size_t &b2){ //N table to tally and make the right nucleotide
+    switch(b1+b2){
+        case 0: { 
+            return 'T'; break; 
+        } 
+        case 2: {
+            return 'G'; break;
+        }
+        case 1: {
+            switch(b1){
+                case 0: {
+                    return 'C'; break;
+                }
+                case 1: {
+                    return 'A'; break; 
+                }
+            }
+            break;
+        }
+    }
+    return 'N';
+}
+
+void TwoBitReader::tokenizer(string &line,string &str_seqID,string &str_start,string &str_end){
+    stringstream check1(line);
+    string token;
+    int h = 0;
+    while(getline(check1, token,'\t'))
+    {  
+        switch(h){
+            case 0: { str_seqID = token; break; }
+            case 1: { str_start = token; break; }
+            case 2: { str_end = token; break; }
+            case 3: { return; }
+        }
+        h++;
+    }
+}
+
+void TwoBitReader::getSequenceLength(fstream &rf,std::map<string,BitIndex*> &seqBitMap){
+    for (auto m : seqBitMap){
+        BitIndex *bi = m.second;
+        rf.seekg(bi->offset,ios::beg);
+        bits32 sequenceSize = 0;
+        rf.read(reinterpret_cast<char *>(&sequenceSize),sizeof(sequenceSize));  
+        bi->sequenceSize = sequenceSize;
+    }
 }
