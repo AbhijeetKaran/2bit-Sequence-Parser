@@ -2,10 +2,10 @@
 twobitParser is a cpp library for accessing content of 2bit files. It also offers extra terminal output functions.
 
 # fasta vs 2bit
-FASTA file is a text-based file for representing either nucleotide sequences or amino acid (protein) sequences.Each record in fasta file format, has a header followed by the sequence, nucleotide or amino acids from the next line. Fasta file can store sigle or multiple sequences and has no upper limit for storage. Data from a fasta file is fetched sequentially but random access can be achived using an index file of the same fasta file.
+- FASTA file is a text-based file for representing either nucleotide sequences or amino acid (protein) sequences.Each record in fasta file format, has a header followed by the sequence, nucleotide or amino acids from the next line. Fasta file can store sigle or multiple sequences and has no upper limit for storage. Data from a fasta file is fetched sequentially but random access can be achived using an index file of the same fasta file.
 File extensions for fasta file are '.fasta', '.fna', '.ffn', '.faa', '.frn' and '.fa'.
 
-2Bit file is a serialized file format which stores only nucleotide sequences. Highly efficient and compact, uses ~4 fold less memory for storage as compared to fasta format, Since each nucleotide is represente by 2 bits instead of 8 bits in ASCII-based text format. 2bit file can store upto 4GB of total genomic size.
+- 2Bit file is a serialized file format which stores only nucleotide sequences. Highly efficient and compact, uses ~4 fold less memory for storage as compared to fasta format, Since each nucleotide is represente by 2 bits instead of 8 bits in ASCII-based text format. 2bit file can store upto 4GB of total genomic size.
 More detailed information about structure of 2bit file format is avialable at UCSC website "http://genome.ucsc.edu/FAQ/FAQformat.html#format7"
 File extensions for a 2bit file is '.2bit'.
 	
