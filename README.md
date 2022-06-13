@@ -85,3 +85,5 @@ Functions with terminal based output
    #### Hard masking sequences using coordinates from bed file
     string bedFile = "example.bed";
     tbr_obj.hardMaskSequencesUsingBedFile(bedFile);
+
+# License
