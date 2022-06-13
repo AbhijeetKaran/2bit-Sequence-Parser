@@ -10,7 +10,10 @@ More detailed information about structure of 2bit file format is avialable at UC
 File extensions for a 2bit file is '.2bit'.
 	
 ### Advantage in term of storage and accessibility
-<add a time and space comparision table>
+| Parameter           | Fasta     | 2bit     |
+| :------------------ | :-------- | :------- |
+| **storage meamory** | 51.8 MB   | 13.2 MB  |
+| **Access time**     | 3 sec     | 1 sec    |
   
 # Usage
 Usage example is also provide in example.cpp file.
