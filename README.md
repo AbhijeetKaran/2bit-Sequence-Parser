@@ -12,11 +12,11 @@ File extensions for a 2bit file is '.2bit'.
 ### Advantage in term of storage and accessibility
 | Parameter           | Fasta     | 2bit     |
 | :------------------ | :-------- | :------- |
-| **storage meamory** | 51.8 MB   | 13.2 MB  |
+| **Storage memory**  | 51.8 MB   | 13.2 MB  |
 | **Access time**     | 3 sec     | 1 sec    |
   
 # Usage
-Usage example is also provide in example.cpp file.
+Usage example is also provide in '''example.cpp''' file.
 
 Example is also provide in example.cpp file 
   #### Including header
