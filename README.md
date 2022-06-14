@@ -1,5 +1,5 @@
 # TwobitParser
-TwobitParser is a cpp library for accessing content of 2bit files. It also offers extra terminal output functions.
+TwobitParser is a cpp library for accessing content of 2bit files. It also offers extra command-line output functions.
 
 # fasta vs 2bit
 - FASTA file is a text-based file for representing either nucleotide sequences or amino acid (protein) sequences.Each record in fasta file format, has a header followed by the sequence, nucleotide or amino acids from the next line. Fasta file can store sigle or multiple sequences and has no upper limit for storage. Data from a fasta file is fetched sequentially but random access can be achived using an index file of the same fasta file.
@@ -10,6 +10,7 @@ More detailed information about structure of 2bit file format is avialable at UC
 File extensions for a 2bit file is '.2bit'.
 	
 ### Advantage in term of storage and accessibility
+'table values needs to be update' 
 | Parameter           | Fasta     | 2bit     |
 | :------------------ | :-------- | :------- |
 | **Storage memory**  | 51.8 MB   | 13.2 MB  |
