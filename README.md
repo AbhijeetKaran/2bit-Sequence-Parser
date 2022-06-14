@@ -50,10 +50,19 @@ Example is also provide in example.cpp file
   
     // using a Bed file
     string bedfile = "example.bed";
+    
+    // gives output in fasta format
     tbr_obj.extractSequenceFromBedFile(bedfile,0);
                       or
+    // gives output in bed format
     tbr_obj.extractSequenceFromBedFile(str_bedfile,1);
-	
+
+
+   #### Fetch basic statistics of the sequence
+     map<char,size_t> m = *(tbr_obj.bases(sequence));
+     for(auto mm : m){
+        cout<<mm.first<<"\t"<<mm.second<<endl;
+     }
   
    #### Fetch Hard masked informations/N block informations
     // Number of N's in complete file
