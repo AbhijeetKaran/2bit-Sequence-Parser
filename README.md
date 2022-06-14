@@ -86,7 +86,7 @@ Example is also provide in example.cpp file
     // all soft masked region in 2bit file
     std::map<string,std::map<int,int>> maskMap = tbr_obj.maskMap;
   
-Functions with terminal based output
+_Functions with command line output_
    #### Converting sequence from 2bit to fasta
     string outputfile = "exampleOutput.fasta";
     tbr_obj.twoBitToFasta(outputfile);
